@@ -1,0 +1,233 @@
+networks:
+  my_network:
+    driver: bridge
+
+services:
+
+  rabbitmq-service:
+    image: rabbitmq:latest
+    container_name: rabbitmq-service
+    ports:
+      - "5672:5672"
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq
+    networks:
+      - my_network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+  
+  customer-database:
+    image: mysql:latest
+    container_name: customer-database
+    environment:
+      MYSQL_DATABASE: 'customer-database'
+      MYSQL_USER: 'admin'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./customer-database:/var/lib/mysql
+    networks:
+      - my_network
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  vehicle-database:
+    image: mysql:latest
+    container_name: vehicle-database
+    environment:
+      MYSQL_DATABASE: 'vehicle-database'
+      MYSQL_USER: 'admin'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      - '3307:3306'
+    volumes:
+      - ./vehicle-database:/var/lib/mysql
+    networks:
+      - my_network
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  workshop-database:
+    image: mysql:latest
+    container_name: workshop-database
+    environment:
+      MYSQL_DATABASE: 'workshop-database'
+      MYSQL_USER: 'admin'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    ports:
+      - '3308:3306'
+    volumes:
+      - ./workshop-database:/var/lib/mysql
+    networks:
+      - my_network
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  pitstop-customer-service:
+    image: pitstop-customer-service
+    container_name: pitstop-customer-service
+    environment:
+      PROD_DB_HOST: 'customer-database'
+      PROD_DB_NAME: 'customer-database'
+      PROD_DB_USER: 'admin'
+      PROD_DB_PASSWORD: 'password'
+      PROD_DB_POR''T: '3306'
+      DB_USER: 'admin'
+      DB_PASSWORD: 'password'
+      DB_NAME: 'customer-database'
+      DB_HOST: 'customer-database'
+      CI_DB_USERNAME: 'admin'
+      CI_DB_PASSWORD: 'password'
+      CI_DB_NAME: 'customer-database'
+      MESSAGE_BUS_USERNAME: 'guest'
+      MESSAGE_BUS_PASSWORD: 'guest'
+      MESSAGE_BUS: rabbitmq-service
+      MESSAGE_BUS_TIMEOUT: 5000
+      PORT: 3001
+    ports:
+      - '3001:3001'
+    networks:
+      - my_network
+    depends_on:
+      rabbitmq-service:
+        condition: service_healthy
+      customer-database:
+        condition: service_healthy
+    healthcheck:
+      test: curl --silent --fail http://localhost:3001
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  pitstop-vehicle-service:
+    image: pitstop-vehicle-service
+    container_name: pitstop-vehicle-service
+    environment:
+      PROD_DB_HOST: 'vehicle-database'
+      PROD_DB_NAME: 'vehicle-database'
+      PROD_DB_USER: 'admin'
+      PROD_DB_PASSWORD: 'password'
+      PROD_DB_PORT: '3307'
+      DB_USER: 'admin'
+      DB_PASSWORD: 'password'
+      DB_NAME: 'vehicle-database'
+      DB_HOST: 'vehicle-database'
+      CI_DB_USERNAME: 'admin'
+      CI_DB_PASSWORD: 'password'
+      CI_DB_NAME: 'vehicle-database'
+      MESSAGE_BUS_USERNAME: 'guest'
+      MESSAGE_BUS_PASSWORD: 'guest'
+      MESSAGE_BUS: rabbitmq-service
+      MESSAGE_BUS_TIMEOUT: 5000
+      PORT: 3002
+    ports:
+      - '3002:3002'
+    networks:
+      - my_network
+    depends_on:
+      rabbitmq-service:
+        condition: service_healthy
+      vehicle-database:
+        condition: service_healthy
+    healthcheck:
+      test: curl --silent --fail http://localhost:3002
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  pitstop-workshop-service:
+    image: pitstop-workshop-service
+    container_name: pitstop-workshop-service
+    environment:
+      PROD_DB_HOST: 'workshop-database'
+      PROD_DB_NAME: 'workshop-database'
+      PROD_DB_USER: 'admin'
+      PROD_DB_PASSWORD: 'password'
+      PROD_DB_PORT: '3308'
+      DB_USER: 'admin'
+      DB_PASSWORD: 'password'
+      DB_NAME: 'workshop-database'
+      DB_HOST: 'workshop-database'
+      CI_DB_USERNAME: 'admin'
+      CI_DB_PASSWORD: 'password'
+      CI_DB_NAME: 'workshop-database'
+      MESSAGE_BUS_USERNAME: 'guest'
+      MESSAGE_BUS_PASSWORD: 'guest'
+      MESSAGE_BUS: rabbitmq-service
+      MESSAGE_BUS_TIMEOUT: 5000
+      PORT: 3003
+    ports:
+      - '3003:3003'
+    networks:
+      - my_network
+    depends_on:
+      workshop-database:
+        condition: service_healthy
+      rabbitmq-service:
+        condition: service_healthy
+    healthcheck:
+      test: curl --silent --fail http://localhost:3003
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  pitstop-express-gateway:
+    image: pitstop-express-gateway
+    container_name: pitstop-express-gateway
+    ports:
+      - '8080:8080'
+    networks:
+      - my_network
+    depends_on:
+      pitstop-customer-service:
+        condition: service_healthy
+      pitstop-vehicle-service:
+        condition: service_healthy
+      pitstop-workshop-service:
+        condition: service_healthy
+    healthcheck:
+      test: curl --silent --fail http://localhost:8080
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+
+  pitstop-webapp:
+    image: pitstop-webapp
+    container_name: pitstop-webapp
+    ports:
+      - '8081:80'
+    networks:
+      - my_network
+    restart: always
